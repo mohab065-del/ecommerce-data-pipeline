@@ -47,8 +47,8 @@ API + CSV  ->  Python ingestion  ->  Cleaning  ->  SQL database  ->  Data qualit
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/USERNAME/REPO_NAME.git
-cd REPO_NAME
+git clone https://github.com/mohab065-del/ecommerce-data-pipeline.git
+cd ecommerce-data-pipeline
 ```
 
 ### 2. Create a virtual environment and install dependencies
