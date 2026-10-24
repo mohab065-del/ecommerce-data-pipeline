@@ -1,0 +1,47 @@
+# Secrets and credentials (NEVER commit these)
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+credentials.*
+config.local.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Airflow
+airflow.cfg
+airflow.db
+airflow-webserver.pid
+webserver_config.py
+logs/
+airflow/logs/
+
+# Databases and backups
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.mdf
+*.ldf
+
+# Large or generated data (remove a line if you want that file in the repo)
+data/raw/
+data/processed/
+*.parquet
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
