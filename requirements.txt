@@ -1,0 +1,8 @@
+requests
+pandas
+numpy
+sqlalchemy
+pyodbc
+dbt-core
+dbt-sqlserver
+python-dotenv
