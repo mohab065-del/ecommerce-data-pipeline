@@ -1,0 +1,19 @@
+name: olist_dbt
+version: '1.0.0'
+config-version: 2
+profile: olist_dbt
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+models:
+  olist_dbt:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+      +as_columnstore: false
+    reports:
+      +materialized: view
+      +schema: reports

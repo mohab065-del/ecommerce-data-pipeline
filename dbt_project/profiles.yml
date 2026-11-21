@@ -1,0 +1,13 @@
+olist_dbt:
+  target: prod
+  outputs:
+    prod:
+      type: sqlserver
+      driver: 'ODBC Driver 18 for SQL Server'
+      server: "{{ env_var('DB_SERVER') }}"
+      database: "{{ env_var('DB_NAME') }}"
+      schema: dbo
+      windows_login: true
+      encrypt: true
+      trust_cert: true
+      threads: 4

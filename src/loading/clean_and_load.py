@@ -1,14 +1,22 @@
+import os
+from urllib.parse import quote_plus
+
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+
+from src.extraction.currency_extractor import fetch_exchange_rates
+from src.extraction.olist_extractor import extract_csv_files
 
 
 def clean_extracted_data(df_dict):
-
     required_tables = {
         "olist_orders_dataset": "olist_orders",
         "olist_customers_dataset": "olist_customers",
         "olist_products_dataset": "olist_products",
         "olist_order_items_dataset": "olist_order_items",
+        "olist_sellers_dataset": "olist_sellers",
+        "product_category_name_translation": "olist_category_translation",
         "exchange_rates": "exchange_rates"
     }
 
@@ -21,7 +29,6 @@ def clean_extracted_data(df_dict):
 
     # Make copies so we don't modify the original data
     for source_name, table_name in required_tables.items():
-
         df = df_dict[source_name].copy()
 
         # Remove extra spaces from text columns
@@ -84,13 +91,10 @@ def clean_extracted_data(df_dict):
 
 
 def load_to_sqlserver(df_dict, db_connection_string):
-
     engine = create_engine(db_connection_string)
 
     with engine.begin() as connection:
-
         for table_name, df in df_dict.items():
-
             df.to_sql(
                 name=table_name,
                 con=connection,
@@ -102,3 +106,29 @@ def load_to_sqlserver(df_dict, db_connection_string):
             print(f"Loaded {len(df)} rows into {table_name}")
 
     engine.dispose()
+
+
+def build_connection_string():
+    load_dotenv()
+    parts = [
+        "DRIVER={ODBC Driver 18 for SQL Server}",
+        f"SERVER={os.environ['DB_SERVER']}",
+        f"DATABASE={os.environ['DB_NAME']}",
+        "TrustServerCertificate=yes",
+    ]
+    if os.getenv("DB_USER"):
+        parts += [f"UID={os.environ['DB_USER']}", f"PWD={os.environ['DB_PASSWORD']}"]
+    else:
+        parts.append("Trusted_Connection=yes")
+    return "mssql+pyodbc:///?odbc_connect=" + quote_plus(";".join(parts))
+
+
+def main():
+    data = extract_csv_files()
+    data["exchange_rates"] = fetch_exchange_rates()
+    cleaned = clean_extracted_data(data)
+    load_to_sqlserver(cleaned, build_connection_string())
+
+
+if __name__ == "__main__":
+    main()

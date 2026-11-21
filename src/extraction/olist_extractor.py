@@ -10,7 +10,7 @@ def extract_csv_files(data_path="data/raw/"):
     dataframes = {}
 
     for file in csv_files:
-        df = pd.read_csv(file)
+        df = pd.read_csv(file, dtype=str)
         dataframes[file.stem] = df
 
     return dataframes
