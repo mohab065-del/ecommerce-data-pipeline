@@ -1,96 +1,105 @@
 # E-Commerce Data Integration & Analytics Pipeline
 
-An end-to-end data pipeline that collects e-commerce data from multiple sources (API and CSV), cleans and models it in a relational database, orchestrates the workflow with Airflow, validates data quality, and presents the results in an analytics dashboard.
+End-to-end data pipeline: Olist Brazilian e-commerce CSV files plus daily BRL to USD exchange rates are cleaned, loaded into SQL Server, modelled into a Star Schema with dbt, and orchestrated with Airflow.
 
 ## Architecture
 
-```
-API + CSV  ->  Python ingestion  ->  Cleaning  ->  SQL database  ->  Data quality checks  ->  Dashboard
-                                                        ^
-                                              Airflow orchestration
-```
+    data/raw/*.csv  +  Frankfurter API (BRL to USD)
+              |
+        src/extraction
+              |
+        src/loading/clean_and_load.py  ->  dbo.olist_* and dbo.exchange_rates
+              |
+        dbt_project:  staging (views) -> marts (tables) -> reports (views)
+              |
+        dags/olist_pipeline_dag.py  (Airflow orchestration)
 
-## Team & Responsibilities
+## Star Schema
 
-| Member | Responsibility |
-|--------|----------------|
-| Member 1 - NAME | Data collection with Python: API requests and CSV files |
-| Member 2 - NAME | Data cleaning, database design, and SQL |
-| Member 3 - NAME | Airflow orchestration, data quality checks, documentation, and dashboard |
+Grain: one row per order item (order_id + order_item_id).
 
-## Project Structure
+    fct_sales  ->  dim_customer   (customer_key = customer_unique_id)
+               ->  dim_product    (product_key)
+               ->  dim_seller     (seller_key)
+               ->  dim_date       (date_key = yyyymmdd)
 
-> Update this section to match your actual folders.
+`fct_sales` holds prices and freight in BRL and USD (`price_usd`, `freight_usd`, `total_usd`), together with `fx_rate`, `fx_rate_date` and `fx_gap_days`.
 
-```
-.
-├── ingestion/        # Python scripts: API + CSV collection
-├── sql/              # Database schema and SQL queries
-├── dags/             # Airflow DAGs
-├── data_quality/     # Data quality checks
-├── dashboard/        # Dashboard app
-├── docs/             # Documentation
-├── requirements.txt
-└── README.md
-```
+Currency conversion uses an as-of join: each order takes the latest exchange rate dated on or before its purchase date.
 
-## Tech Stack
+Reporting views (schema `reports`): `rpt_daily_revenue`, `rpt_category_performance`, `rpt_customer_value`.
 
-- **Python** (requests, pandas) for ingestion and cleaning
-- **SQL** for database design and analytics queries
-- **Apache Airflow** for orchestration
-- **Data quality checks** for validation
-- **Dashboard** for visualization
+Indexes on the join and filter columns of `fct_sales` and on the dimension keys are created by a dbt post-hook (`create_index` macro).
 
-## Getting Started
+## Project structure
 
-### 1. Clone the repository
+    .
+    ├── run_pipeline.py            run everything: load, then dbt
+    ├── requirements.txt
+    ├── data/raw/                  Olist CSV files (not tracked by Git)
+    ├── src/
+    │   ├── extraction/            olist_extractor.py, currency_extractor.py
+    │   └── loading/               clean_and_load.py
+    ├── dbt_project/
+    │   ├── macros/
+    │   └── models/                staging, marts, reports
+    └── dags/                      olist_pipeline_dag.py
 
-```bash
-git clone https://github.com/mohab065-del/ecommerce-data-pipeline.git
-cd ecommerce-data-pipeline
-```
+## Setup
 
-### 2. Create a virtual environment and install dependencies
+1. Install dependencies: `pip install -r requirements.txt`
+2. Install Microsoft ODBC Driver 18 for SQL Server and create an empty database.
+3. Download the Olist dataset and place the CSV files in `data/raw/`.
+4. Create a `.env` file in the project root (it is ignored by Git):
 
-```bash
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS / Linux
-pip install -r requirements.txt
-```
+        DB_SERVER=your_server
+        DB_NAME=your_database
 
-### 3. Configure environment variables
+   For SQL authentication also set `DB_USER` and `DB_PASSWORD`.
+5. `dbt_project/profiles.yml` uses Windows authentication. For SQL authentication replace `windows_login: true` with `user` and `password` read from `env_var('DB_USER')` and `env_var('DB_PASSWORD')`, and do not commit that change.
 
-Create a `.env` file in the project root (it is excluded from Git) with your own database credentials:
+## Run
 
-```
-DB_SERVER=your_server
-DB_NAME=your_database
-DB_USER=your_user
-DB_PASSWORD=your_password
-```
+Everything in one command:
 
-### 4. Run the pipeline
+    python run_pipeline.py
 
-> Replace with your actual commands.
+Skip the loading step when the raw tables are already loaded:
 
-```bash
-python ingestion/main.py
-```
+    python run_pipeline.py --skip-load
 
-## Data Quality
+Step by step:
 
-Describe the checks performed (for example: null checks, duplicate checks, valid value ranges, row counts) and where the results are reported.
+    python -m src.loading.clean_and_load
+    cd dbt_project
+    dbt deps
+    dbt run --select staging marts
+    dbt test
+    dbt run --select reports
 
-## Dashboard
+dbt does not read `.env`. `run_pipeline.py` loads it for you; for manual dbt runs set `DB_SERVER` and `DB_NAME` as environment variables first.
 
-Describe how to launch the dashboard and what it shows (for example: sales by category, top products, trends).
+## Data quality
 
-## Documentation
+dbt tests cover unique and not-null keys, relationships between the fact and every dimension, and the age of the exchange rate used (`fx_gap_days`). Missing exchange rates or rates older than 7 days raise warnings without stopping the pipeline.
 
-Additional documentation is available in the `docs/` folder.
+## Edge cases handled
 
-## License
+| Case | Handling |
+|---|---|
+| Order date without an exchange rate (weekends, holidays) | As-of join uses the latest earlier rate; `fx_gap_days` shows its age |
+| Order earlier than the first available rate | USD columns stay NULL and a warning test flags them |
+| Invalid or duplicate exchange rates | Removed in `stg_fx_rates` |
+| Duplicate order items | Deduplicated in `stg_order_items` |
+| `customer_id` changes on every order | `dim_customer` is keyed on `customer_unique_id` |
+| Products without a category translation | Falls back to the Portuguese name, then `unknown` |
+| Zip codes losing leading zeros | CSV files are read as strings |
+| Re-running the pipeline | Tables are rebuilt, so every run is idempotent |
 
-For educational / academic use.
+## Airflow
+
+`dags/olist_pipeline_dag.py` runs `extract_clean_load`, `dbt_deps`, `dbt_run`, `dbt_test` and `dbt_run_reports` in sequence. Adjust `PROJECT_DIR` to the location of the project inside your Airflow environment. Windows authentication does not work from Linux or Docker, so use SQL authentication there.
+
+## Team
+
+Add team member names here.
