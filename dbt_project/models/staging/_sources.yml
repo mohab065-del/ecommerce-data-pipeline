@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: olist
+    schema: dbo
+    tables:
+      - name: orders
+        identifier: olist_orders
+      - name: order_items
+        identifier: olist_order_items
+      - name: customers
+        identifier: olist_customers
+      - name: products
+        identifier: olist_products
+      - name: sellers
+        identifier: olist_sellers
+      - name: category_translation
+        identifier: olist_category_translation
+      - name: brl_usd_rates
+        identifier: exchange_rates
