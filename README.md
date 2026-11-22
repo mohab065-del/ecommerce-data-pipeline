@@ -102,4 +102,6 @@ dbt tests cover unique and not-null keys, relationships between the fact and eve
 
 ## Team
 
-Add team member names here.
+- Mohab Hany Aziz
+- Rawda Sherif
+- Rawan Sherif
