@@ -2,6 +2,12 @@
 
 End-to-end data pipeline: Olist Brazilian e-commerce CSV files plus daily BRL to USD exchange rates are cleaned, loaded into SQL Server, modelled into a Star Schema with dbt, and orchestrated with Airflow.
 
+## Live dashboard
+
+https://ecommerce-data-pipeline-ib4n82q33qn7k8wtr3etan.streamlit.app/
+
+The dashboard reads the CSV snapshots in dashboard/snapshots. To refresh them run python -m dashboard.export_data and push the new files. To run it locally: pip install streamlit plotly, then streamlit run dashboard/app.py.
+
 ## Architecture
 
     data/raw/*.csv  +  Frankfurter API (BRL to USD)
@@ -24,6 +30,9 @@ Grain: one row per order item (order_id + order_item_id).
                ->  dim_date       (date_key = yyyymmdd)
 
 `fct_sales` holds prices and freight in BRL and USD (`price_usd`, `freight_usd`, `total_usd`), together with `fx_rate`, `fx_rate_date` and `fx_gap_days`.
+
+See [docs/ERD.md](docs/ERD.md) for the complete Mermaid entity relationship diagram.
+See [docs/star_schema.sql](docs/star_schema.sql) for the SQL Server DDL.
 
 Currency conversion uses an as-of join: each order takes the latest exchange rate dated on or before its purchase date.
 
