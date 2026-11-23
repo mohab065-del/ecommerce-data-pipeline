@@ -1,0 +1,12 @@
+table_name,row_count
+fct_sales,112650
+dim_customer,96096
+dim_product,32951
+dim_seller,3095
+dim_date,1461
+olist_orders,99441
+olist_order_items,112650
+olist_customers,99441
+olist_products,32951
+olist_sellers,3095
+exchange_rates,3979
